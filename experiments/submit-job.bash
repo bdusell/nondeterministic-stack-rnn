@@ -21,7 +21,7 @@ Queues batch jobs.
 job_name=$1
 output_dir=$2
 device=$3
-shift 3
+shift 3 || true
 args=("$@")
 
 if [[ ! $job_name || ! $output_dir || ! $device ]]; then
