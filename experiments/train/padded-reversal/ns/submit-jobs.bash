@@ -14,7 +14,7 @@ for learning_rate in "${LEARNING_RATES[@]}"; do
   for trial_no in "${TRIALS[@]}"; do
     hyperparams=$learning_rate
     key=$name-$hyperparams-$trial_no
-    bash experiments/submit-job.bash $key $logs/outputs cpu \
+    bash experiments/submit-job.bash $key $logs/outputs gpu \
       poetry run python src/train.py \
         --device cuda \
         --output $logs/logs/$hyperparams/$trial_no \
