@@ -7,7 +7,7 @@ logs=$(dirname "$BASH_SOURCE")
 
 [[ $BASH_SOURCE =~ /([^/]+)/submit-jobs\.bash$ ]]
 task=${BASH_REMATCH[1]}
-name=gen-test-$task
+key=test-data-$task
 
 bash experiments/submit-job.bash $key $logs/outputs cpu \
   poetry run python src/generate_test_data.py \

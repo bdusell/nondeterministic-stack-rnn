@@ -7,6 +7,7 @@ logs=$(dirname "$BASH_SOURCE")
 
 mkdir -p $logs/{png,tex}
 for task in "${TASKS[@]}"; do
+  task=plot-train-$task
   bash experiments/submit-job.bash $key $logs/outputs cpu \
     poetry run python src/plot_train.py \
       --inputs $(
