@@ -1,4 +1,4 @@
-# Learning Context-free Languages with Nondeterministic Stack RNNs
+# Learning Context-Free Languages with Nondeterministic Stack RNNs
 
 This repository contains the code for the paper "Learning Context-Free
 Languages with Nondeterministic Stack RNNs" (DuSell and Chiang, 2020)
