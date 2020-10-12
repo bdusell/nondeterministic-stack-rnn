@@ -6,7 +6,8 @@
 # of output files unique.
 # The third argument is "gpu" if the job should be run on a GPU, and "cpu"
 # otherwise.
-# The rest of the arguments are the command that should be run.
+# The rest of the arguments are the command that should be run. It will include
+# `poetry run`.
 
 set -e
 set -o pipefail
@@ -29,4 +30,6 @@ if [[ ! $job_name || ! $output_dir || ! $device ]]; then
   exit 1
 fi
 
+# You may want to replace this with some sort of call to `docker exec` or
+# `singularity exec`.
 echo "[$job_name] [$output_dir] [$device] ${args[@]}"

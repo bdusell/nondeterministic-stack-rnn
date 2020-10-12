@@ -1,7 +1,18 @@
 # Learning Context-free Languages with Nondeterministic Stack RNNs
 
-This repository contains the code for the paper "Learning Context-free
-Languages with Nondeterministic Stack RNNs" (DuSell and Chiang, 2020).
+This repository contains the code for the paper "Learning Context-Free
+Languages with Nondeterministic Stack RNNs" (DuSell and Chiang, 2020)
+\[[arXiv](https://arxiv.org/abs/2010.04674)\].
+It contains a PyTorch implementation of the Nondeterministic Stack RNN
+(NS-RNN) model proposed in the paper, as well as implementations of the
+following stack RNN models:
+
+* The superposition-based Stack LSTM from "Inferring Algorithmic Patterns with
+  Stack-Augmented Recurrent Nets" (Joulin and Mikolov, 2015)
+  \[[pdf](https://papers.nips.cc/paper/5857-inferring-algorithmic-patterns-with-stack-augmented-recurrent-nets.pdf)\]
+* The stratification-based Stack LSTM from "Learning to Transduce with
+  Unbounded Memory" (Grefenstette et al., 2015)
+  \[[pdf](https://papers.nips.cc/paper/5648-learning-to-transduce-with-unbounded-memory.pdf)\]
 
 ## Directory Structure
 
@@ -73,25 +84,24 @@ want to use Singularity instead of Docker, since it is more suitable for shared
 computing environments and is often available on HPC clusters instead of
 Docker.
 
-In order to run the Singularity container, you must build or download the
-`.sif` (Singularity image) file. You can pull the public Singularity image
+In order to run the Singularity container, you must build the `.sif`
+(Singularity image) file from the Docker image. You can pull the public Docker
+image and convert it to the file `nondeterministic-stack-rnn.sif` by running
+
+    $ bash scripts/build-singularity-image.bash --pull
+
+Note that this will take several minutes. Since Docker is probably not
+available on your HPC cluster, you may want to run this on a private
+workstation where Docker and Singularity are installed, then `scp` the `.sif`
+file to the HPC cluster.
+
+Once the image is built, you can open a shell in the Singularity container
 using
-
-    $ bash scripts/pull-singularity-image.bash
-
-This will download the image to the file `nondeterministic-stack-rnn.sif`.
-
-If you like, you can also build the image yourself by first building (or
-pulling) the Docker image and converting it to a Singularity image.
-
-    $ bash scripts/build-singularity-image.bash --build
-
-You can open a shell in the Singularity container using
 
     $ bash scripts/singularity-shell.bash
 
-This will work on both GPU and CPU machines, although it will output a warning
-if there is no GPU.
+This will work on both GPU and CPU machines (it will output a harmless warning
+if there is no GPU).
 
 You can find a more general tutorial on Singularity
 [here](https://github.com/bdusell/singularity-tutorial).
@@ -109,7 +119,27 @@ container*:
 
     $ bash scripts/setup.bash
 
+All commands to run experiments need to be prefixed with `poetry run` so that
+they have access to the Python packages managed by Poetry.
+
 ## Running Experiments
 
 The [`experiments`](experiments) directory contains scripts for running all of
-the experiments and generating all of the plots presented in the paper.
+the experiments and generating all of the plots presented in the paper. The
+experiments are split up into the following steps:
+
+* Train each model multiple times on each task, testing different
+  hyperparameters. Record validation perplexity and save the trained models.
+* Figure out which hyperparameter setting for each model worked best on the
+  validation set.
+* Generate test sets.
+* For each model and task, evaluate the saved models from the best
+  hyperparameter setting on the test set.
+* Generate the figures for training and test performance presented in the
+  paper.
+
+The script [`submit-job.bash`](experiments/submit-job.bash) is a stub that is
+called by all of the experiment scripts. By default it prints its arguments,
+but you can edit it to submit experiments to your batch job scheduler of
+choice. You may find this a convenient way to replicate the findings of our
+paper on your own computing infrastructure.
