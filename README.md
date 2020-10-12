@@ -142,4 +142,6 @@ The script [`submit-job.bash`](experiments/submit-job.bash) is a stub that is
 called by all of the experiment scripts. By default it prints its arguments,
 but you can edit it to submit experiments to your batch job scheduler of
 choice. You may find this a convenient way to replicate the findings of our
-paper on your own computing infrastructure.
+paper on your own computing infrastructure. All scripts in `experiments` are
+meant to be run outside of the container and must be run with the top-level
+directory of this repository as the current working directory.
