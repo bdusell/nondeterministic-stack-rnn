@@ -36,7 +36,7 @@ In order to improve reproducibility, the code for this paper was developed and
 run inside of a [Docker](https://www.docker.com/) container defined in the file
 [`Dockerfile`](Dockerfile). To run this code, you can build or pull the Docker
 image for the container yourself or simply use `Dockerfile` as a reference for
-setting up the dependencies on your own system. You can also build or pull an
+setting up the dependencies on your own system. You can also build an
 equivalent [Singularity](https://sylabs.io/docs/#singularity) image which can
 be used on an HPC cluster, where Singularity is more likely to be available
 than Docker.
