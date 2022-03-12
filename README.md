@@ -35,7 +35,9 @@ This repository includes PyTorch implementations of the following models:
 
 ## Directory Structure
 
-* `data/`: Contains data used for experiments, including Mikolov's PTB language
+* `data/`: Contains datasets used for experiments, namely the PTB language
+  modeling dataset and the test suite definitions required to compute SG
+  scores.
 * `experiments/`: Contains scripts for reproducing all of the experiments and
   figures presented in the paper.
   * `train/`: Scripts for training models on the CFL tasks.
@@ -69,7 +71,7 @@ but Singularity is.
 In any case, it is highly recommended to run experiments that use the NS-RNN or
 RNS-RNN models on a machine with access to an NVIDIA GPU so that they finish
 within a reasonable amount of time. On the other hand, the experiments for the
-baseline models (LSTM, Joulin-Mikolov Stack LSTM, and Grefenstette Stack LSTM)
+baseline models (LSTM, superposition stack LSTM, and stratification stack LSTM)
 finish more quickly on CPU rather than GPU and should be run in CPU mode.
 
 ### Using Docker
@@ -145,15 +147,26 @@ More specifically, this script:
   [Poetry](https://python-poetry.org/) to manage Python packages.
 * Downloads and preprocesses the Penn Treebank language modeling dataset.
 
+## Running Code
+
+All files under `src/` should be run using `poetry` so they have access to the
+Python packages provided by the Poetry package manager. This means you should
+either prefix all of your commands with `poetry run` or run `poetry shell`
+beforehand to enter a shell with Poetry's virtualenv enabled all the time. You
+should run both Python and Bash scripts with Poetry, because the Bash scripts
+might call out to Python scripts.
+
 ## Running Experiments
 
 The [`experiments`](experiments) directory contains scripts for reproducing
 all of the experiments and plots presented in the paper. These scripts are
-intended to be used to submit jobs to a computing cluster. You will need to
-edit the file [`experiments/submit-job.bash`](experiments/submit-job.bash)
+intended to be used to submit jobs to a computing cluster. They should be run
+outside of the container. You will need to edit the file
+[`experiments/submit-job.bash`](experiments/submit-job.bash)
 to tailor it to your specific computing cluster.
 
 The script `src/get_ptb_results.bash` is used to report results for the PTB
-experiments. Given a directory containing multiple pre-trained random restarts,
-it will select the model with the best validation perplexity, print parameter
-counts, compute test perplexity, and compute the SG score.
+experiments and should be run inside the container. Given a directory
+containing multiple pre-trained random restarts, it will select the model with
+the best validation perplexity, print parameter counts, compute test
+perplexity, and compute the SG score.
