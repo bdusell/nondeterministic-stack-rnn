@@ -156,6 +156,9 @@ beforehand to enter a shell with Poetry's virtualenv enabled all the time. You
 should run both Python and Bash scripts with Poetry, because the Bash scripts
 might call out to Python scripts.
 
+All scripts under `scripts/` should be run with the top-level directory as the
+current working directory.
+
 ## Running Experiments
 
 The [`experiments`](experiments) directory contains scripts for reproducing

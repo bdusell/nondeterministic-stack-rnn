@@ -3,6 +3,7 @@ data/
 experiments/
 tests/
 ignore/
+code.zip
 
 Dockerfile*
 **/.docker*
