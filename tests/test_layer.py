@@ -3,7 +3,7 @@ import unittest
 import numpy
 import torch
 
-from nsrnn.pytorch_tools.layer import Layer, MultiLayer
+from torch_extras.layer import Layer, MultiLayer
 
 class TestLayer(unittest.TestCase):
 

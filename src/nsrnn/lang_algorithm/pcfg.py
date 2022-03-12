@@ -35,15 +35,6 @@ def compute_parse_grammar_log_probability(parses):
             return result
     return recurse(parses.start)
 
-def string_probability(parser, string):
-    parses = parser.to_parse_grammar(string)
-    try:
-        ll = compute_parse_grammar_log_probability(parses)
-    except NoParses:
-        return 0.0
-    else:
-        return math.exp(ll)
-
 def string_log_probability(parser, string):
     parses = parser.to_parse_grammar(string)
     try:

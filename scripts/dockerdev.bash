@@ -140,6 +140,7 @@ dockerdev_start_new_dev_container() {
   if $x11; then
     local userid
     local groupid
+    local dockergroupid
     # Connect the container to the host's X server and make a home directory.
     # See http://wiki.ros.org/docker/Tutorials/GUI
     # and https://medium.com/@SaravSun/running-gui-applications-inside-docker-containers-83d65c0db110
@@ -162,8 +163,13 @@ dockerdev_start_new_dev_container() {
         docker exec -i -u 0:0 "$container_name" sh -c "$add_user"
         ;;
       *)
+        # Make sure to add the docker group to the user so we have the proper
+        # permissions to run Docker-in-Docker.
+        dockergroupid=$(getent group docker | cut -d : -f 3) &&
         dockerdev_start_new_container "$container_name" "$image_name" -it \
           -u "$userid":"$groupid" \
+          --group-add "$dockergroupid" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
           -e DISPLAY \
           -v /etc/group:/etc/group:ro \
           -v /etc/passwd:/etc/passwd:ro \

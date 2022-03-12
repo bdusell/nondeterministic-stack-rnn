@@ -24,3 +24,18 @@ class RandomShuffling(Curriculum):
 
     def done(self):
         return True
+
+class InOrder(Curriculum):
+
+    def __init__(self, data):
+        super().__init__()
+        self._data = data
+
+    def step(self):
+        pass
+
+    def data(self):
+        return self._data
+
+    def done(self):
+        return True

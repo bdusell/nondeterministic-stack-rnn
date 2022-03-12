@@ -1,36 +1,51 @@
 import copy
 import datetime
 import math
+import random
 
 import attr
 import numpy
 import torch
 
+from torch_extras.early_stopping import UpdatesWithoutImprovement
 from nsrnn.pytorch_tools.curriculum import RandomShuffling
-from nsrnn.pytorch_tools.early_stopping import EarlyStopping
 from nsrnn.ticker import TimedTicker
+from .cli_util import parse_interval
+from .cfl_data_util import generate_batches, batches_to_sequences
 
 def add_train_arguments(parser):
     group = parser.add_argument_group('Training options')
     group.add_argument('--shuffle-seed', type=int,
         help='Random seed used for random shuffling.')
-    add_optimizer_args(group, default='SGD')
+    add_optimizer_args(group, default='Adam')
     group.add_argument('--learning-rate', type=float, required=True,
         help='Initial learning rate.')
-    group.add_argument('--learning-rate-patience', type=int, default=0,
+    group.add_argument('--learning-rate-patience', type=int,
+        default=5,
         help='Number of epochs of no improvement before the learning rate is '
              'decreased.')
-    group.add_argument('--learning-rate-decay', type=float, default=0.9,
+    group.add_argument('--learning-rate-decay', type=float,
+        default=0.9,
         help='The learning rate will be multiplied by this factor when '
              'patience runs out. Should be between 0 and 1.')
-    group.add_argument('--l2-regularizer-lambda', type=float, default=0,
+    group.add_argument('--l2-regularizer-lambda', type=float,
+        default=0,
         help='Coefficient for the L2 regularizer.')
     group.add_argument('--gradient-clipping', type=float,
+        default=5,
         help='Gradient clipping threshold.')
-    group.add_argument('--epochs', type=int, required=True,
+    group.add_argument('--epochs', type=int,
+        default=200,
         help='Maximum number of epochs to run.')
-    group.add_argument('--early-stopping-patience', type=int, default=5,
+    group.add_argument('--early-stopping-patience', type=int,
+        default=10,
         help='Number of epochs of no improvement before training stops.')
+    group.add_argument('--vis-data-seed', type=int)
+    group.add_argument('--vis-length-range', type=parse_interval)
+    group.add_argument('--vis-data-size', type=int, default=5)
+    group.add_argument('--vis-updates', type=int)
+    group.add_argument('--show-outputs', action='store_true', default=False)
+    group.add_argument('--log-stack-signals', action='store_true', default=False)
 
 def parse_optimizer_class(s):
     return getattr(torch.optim, s)
@@ -46,8 +61,7 @@ class TrainState:
     update_no = attr.ib()
     batch_no = attr.ib()
 
-def train(args, saver, parameter_groups, train_data, valid_data, vocab,
-        model_interface, events, logger):
+def train(args, saver, parameter_groups, data, model_interface, events, logger):
 
     model = saver.model
     show_progress = not args.no_progress
@@ -55,10 +69,30 @@ def train(args, saver, parameter_groups, train_data, valid_data, vocab,
     # Seed the RNG used to shuffle the data during training.
     shuffle_generator = numpy.random.RandomState(args.shuffle_seed)
 
-    # Pick some example data to print every once in a while.
-    max_printed_batch_size = 5
-    printed_batch = valid_data[shuffle_generator.choice(len(valid_data))]
-    printed_batch = tuple(x[:max_printed_batch_size] for x in printed_batch)
+    # Generate some data used for visualization.
+    if args.vis_length_range is not None:
+        vis_valid_lengths = data.sampler.valid_lengths(args.vis_length_range)
+    else:
+        vis_valid_lengths = data.train_lengths
+    if args.show_outputs or args.log_stack_signals:
+        vis_data_size = args.vis_data_size
+    else:
+        vis_data_size = 0
+    vis_data_generator = random.Random(args.vis_data_seed)
+    vis_data = list(generate_batches(
+        sampler=data.sampler,
+        valid_lengths=vis_valid_lengths,
+        num_samples=vis_data_size,
+        batch_size=1,
+        vocab_size=data.vocab.size(),
+        generator=vis_data_generator,
+        device=data.train_data[0][0].device
+    ))
+    events.log('vis_data', { 'data' : list(batches_to_sequences(vis_data)) })
+    if args.vis_updates:
+        vis_updates = args.vis_updates
+    else:
+        vis_updates = len(data.train_data)
 
     # Configure the optimization process.
     OptimizerClass = args.optimizer
@@ -67,7 +101,7 @@ def train(args, saver, parameter_groups, train_data, valid_data, vocab,
         lr=args.learning_rate,
         weight_decay=args.l2_regularizer_lambda
     )
-    early_stopping = EarlyStopping(
+    early_stopping = UpdatesWithoutImprovement(
         'min',
         patience=args.early_stopping_patience
     )
@@ -78,7 +112,7 @@ def train(args, saver, parameter_groups, train_data, valid_data, vocab,
         patience=args.learning_rate_patience,
         factor=args.learning_rate_decay
     )
-    learning_curriculum = RandomShuffling(train_data, shuffle_generator)
+    learning_curriculum = RandomShuffling(data.train_data, shuffle_generator)
 
     # Configure the loss function.
     criterion = torch.nn.CrossEntropyLoss(reduction='none')
@@ -110,13 +144,13 @@ def train(args, saver, parameter_groups, train_data, valid_data, vocab,
         train_num_symbols = 0
         curr_num_symbols = 0
 
-        model.train()
         for batch_no, (x, y) in enumerate(learning_curriculum.data()):
             train_state.batch_no = batch_no
             optimizer.zero_grad()
             # Evaluate the model (forward pass).
             # logits : B x n x V
-            logits = model_interface.get_logits(model, x, train_state)
+            model.train()
+            logits = model_interface.get_logits(saver, x, train_state)
             # Get the loss term for each symbol.
             # y : B x n
             # symbol_losses : B x n
@@ -160,6 +194,17 @@ def train(args, saver, parameter_groups, train_data, valid_data, vocab,
                 curr_loss = 0.0
                 curr_perp_numer = 0.0
                 curr_num_symbols = 0
+            # Log some information on some example data for analysis.
+            if train_state.update_no % vis_updates == 0:
+                if args.show_outputs:
+                    for vis_batch in vis_data:
+                        model_interface.print_example(saver, vis_batch, data.vocab, logger)
+                if args.log_stack_signals:
+                    signals_list = []
+                    for x, y in vis_data:
+                        signals = model_interface.get_signals(saver, x, train_state)
+                        signals_list.append(signals)
+                    events.log('signals', { 'values' : signals_list })
         # Summarize training progress for this epoch.
         avg_train_loss = train_loss / train_num_symbols
         avg_train_perplexity = math.exp(train_perp_numer / train_num_symbols)
@@ -171,13 +216,10 @@ def train(args, saver, parameter_groups, train_data, valid_data, vocab,
             'perplexity' : avg_train_perplexity
         })
 
-        # Show example outputs from the model.
-        model_interface.print_example(model, printed_batch, vocab, logger)
-
         # Evaluate the model on the validation set.
         valid_scores = evaluate(
-            model,
-            valid_data,
+            saver,
+            data.valid_data,
             model_interface,
             show_progress,
             logger,
@@ -225,20 +267,21 @@ def train(args, saver, parameter_groups, train_data, valid_data, vocab,
     events.log('train', result)
     return result
 
-def evaluate(model, batches, model_interface, show_progress, logger,
+def evaluate(saver, batches, model_interface, show_progress, logger,
         logger_indent=''):
+    # TODO Make accuracy optional, skip during training
     s = logger_indent
-    model.eval()
     perp_numer = 0.0
     acc_numer = 0
     num_symbols = 0
+    saver.model.eval()
     with torch.no_grad():
         ticker = TimedTicker(len(batches), 1)
         for batch_no, (x, y_target) in enumerate(batches):
             # Let B be batch size, n be sequence length, and V be vocabulary size.
             # y_logits : B x n x V
             # y_target : B x n of int in [0, V-1]
-            y_logits = model_interface.get_logits(model, x, None)
+            y_logits = model_interface.get_logits(saver, x, None)
             # Compute the numerator for the perplexity score.
             # -log(p_M(y_target)) = -\sum_t log(p_M(y_target_{t} | y_target_{<t}))
             y_neg_log_prob = torch.nn.functional.cross_entropy(

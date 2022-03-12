@@ -1,28 +1,33 @@
+import typing
+
 import torch
 
-from ..pytorch_tools.unidirectional_rnn import UnidirectionalLSTM
-from ..pytorch_tools.layer import Layer, MultiLayer
+from torch_extras.layer import Layer
 from .common import StackRNNBase
 
 class GrefenstetteRNN(StackRNNBase):
 
-    def __init__(self, input_size, hidden_units, stack_embedding_size,
-            synchronized, controller=UnidirectionalLSTM):
-        super().__init__(
-            input_size, hidden_units, stack_embedding_size, controller)
-        if synchronized:
-            action_layers = 1
-        else:
-            action_layers = stack_embedding_size
-        self.action_layer = MultiLayer(hidden_units, 2, action_layers,
-            torch.nn.Sigmoid())
-        self.push_value_layer = Layer(hidden_units, stack_embedding_size,
-            torch.nn.Tanh())
+    def __init__(self,
+            input_size: int,
+            stack_embedding_size: int,
+            controller: typing.Callable
+        ):
+        super().__init__(input_size, stack_embedding_size, controller)
+        self.action_layer = Layer(
+            self.controller.output_size(),
+            2,
+            torch.nn.Sigmoid()
+        )
+        self.push_value_layer = Layer(
+            self.controller.output_size(),
+            stack_embedding_size,
+            torch.nn.Tanh()
+        )
 
-    def initial_stack(self, batch_size, stack_size, device):
+    def initial_stack(self, batch_size, stack_size):
         return GrefenstetteStack(
             elements=[],
-            bottom=torch.zeros(batch_size, self.stack_size, device=device)
+            bottom=torch.zeros((batch_size, stack_size), device=self.device)
         )
 
     class State(StackRNNBase.State):
@@ -42,12 +47,12 @@ class GrefenstetteStack:
         device = self.bottom.device
         batch_size = self.bottom.size(0)
         result = self.bottom
-        strength_left = torch.ones(batch_size, 1, device=device)
+        strength_left = torch.ones((batch_size,), device=device)
         for value, strength in reversed(self.elements):
             result = result + value * torch.min(
                 strength,
                 torch.nn.functional.relu(strength_left)
-            )
+            )[:, None]
             strength_left = strength_left - strength
         return result
 
@@ -58,8 +63,8 @@ class GrefenstetteStack:
         )
 
     def next_elements(self, actions, push_value):
-        push_strength = actions[:, :, :1].squeeze(-1)
-        pop_strength = actions[:, :, 1:].squeeze(-1)
+        push_strength = actions[:, 0]
+        pop_strength = actions[:, 1]
         result = []
         strength_left = pop_strength
         for value, strength in reversed(self.elements):

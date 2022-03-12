@@ -6,7 +6,7 @@ import sys
 
 import torch
 
-from utils.model_util import ModelInterface
+from utils.model_util import CFLModelInterface
 from utils.train_util import evaluate
 
 def main():
@@ -16,7 +16,7 @@ def main():
     logger.addHandler(logging.StreamHandler())
     logger.setLevel(logging.INFO)
 
-    model_interface = ModelInterface(use_init=False, require_output=False)
+    model_interface = CFLModelInterface(use_init=False, require_output=False)
 
     parser = argparse.ArgumentParser(
         description=
@@ -45,7 +45,7 @@ def main():
             batches = length_info['batches']
             logger.info(f'testing length {length}')
             result = evaluate(
-                saver.model,
+                saver,
                 batches,
                 model_interface,
                 show_progress=not args.no_progress,

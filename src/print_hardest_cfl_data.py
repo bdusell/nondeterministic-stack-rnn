@@ -3,7 +3,7 @@ import random
 
 from nsrnn.grammars.hardest_cfl import HardestCFLGrammar
 from utils.cli_util import parse_interval
-from utils.data_util import construct_sampler
+from utils.cfl_data_util import construct_sampler
 
 START_CONTENT = '\033[32m'
 END_CONTENT = '\033[0m'

@@ -6,7 +6,9 @@ set -o pipefail
 usage() {
   echo "Usage: $0 [options]
 
-Ensure that the Docker image has been created.
+Ensure that the Docker image exists locally, either by pulling the public
+version or building it from scratch. If no options are passed, this script does
+nothing.
   
 Options:
   --pull    Pull the public Docker image.
@@ -27,5 +29,5 @@ done
 case $mode in
   none) ;;
   pull) bash scripts/pull-docker-image.bash ;;
-  build) bash scripts/build-docker-image.bash ;;
+  build) bash scripts/build-docker-dev-image.bash ;;
 esac

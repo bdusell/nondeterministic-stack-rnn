@@ -48,6 +48,13 @@ class Semiring:
             dtype = like_tensor.dtype
         return self.set.zeros(size, device, dtype)
 
+    def ones(self, size, device=None, dtype=None, like=None):
+        if like is not None:
+            like_tensor = self.get_tensor(like)
+            device = like_tensor.device
+            dtype = like_tensor.dtype
+        return self.set.ones(size, device, dtype)
+
     def combine(self, args, f):
         return self.set.combine(args, f)
 
@@ -115,6 +122,10 @@ class Set:
     def zeros(self, size, device, dtype):
         return self.primitive(torch.full(
             size, self.zero, device=device, dtype=dtype))
+
+    def ones(self, size, device, dtype):
+        return self.primitive(torch.full(
+            size, self.one, device=device, dtype=dtype))
 
     def combine(self, args, f):
         raise NotImplementedError

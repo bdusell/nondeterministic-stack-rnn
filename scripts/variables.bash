@@ -1,1 +1,2 @@
-IMAGE=nondeterministic-stack-rnn
+IMAGE=renormalizing-ns-rnn
+DEV_IMAGE=$IMAGE-dev

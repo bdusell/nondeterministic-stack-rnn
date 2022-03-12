@@ -15,7 +15,7 @@ for learning_rate in "${LEARNING_RATES[@]}"; do
     hyperparams=$learning_rate
     key=$name-$hyperparams-$trial_no
     bash experiments/submit-job.bash $key $logs/outputs cpu \
-      poetry run python src/train.py \
+      poetry run python src/train_cfl.py \
         --device cpu \
         --output $logs/logs/$hyperparams/$trial_no \
         --no-progress \

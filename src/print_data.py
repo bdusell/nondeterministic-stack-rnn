@@ -4,8 +4,8 @@ import random
 import torch
 
 from utils.cli_util import parse_interval
-from utils.data_util import generate_batches, construct_sampler
-from utils.task_util import add_task_arguments, parse_task
+from utils.cfl_data_util import generate_batches, construct_sampler
+from utils.cfl_task_util import add_task_arguments, parse_task
 
 def main():
 

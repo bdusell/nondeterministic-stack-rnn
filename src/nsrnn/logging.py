@@ -20,13 +20,15 @@ class FileLogger(Logger):
         self.reopen = reopen
 
     def log(self, event_type, data=None):
-        timestamp = str(get_current_timestamp())
-        self.file.write(event_type)
+        self.log_event(LogEvent(event_type, get_current_time(), data))
+
+    def log_event(self, event):
+        self.file.write(event.type)
         self.file.write(' ')
-        self.file.write(timestamp)
-        if data is not None:
+        self.file.write(str(event.timestamp.timestamp()))
+        if event.data is not None:
             self.file.write(' ')
-            json.dump(data, self.file, separators=(',', ':'), sort_keys=True)
+            json.dump(event.data, self.file, separators=(',', ':'), sort_keys=True)
         self.file.write('\n')
         if self.reopen:
             self.file.close()
@@ -37,27 +39,33 @@ class FileLogger(Logger):
 def read_log_file(file):
     return map(parse_log_line, file)
 
-def parse_log_line(line):
-    fields = line.split(' ', 2)
-    try:
-        event_type, timestamp_str = fields
-    except ValueError:
-        event_type, timestamp_str, data_str = fields
-        data = json.loads(data_str)
-    else:
-        data = None
-    timestamp = parse_timestamp(float(timestamp_str))
-    return ModelLogEvent(event_type, timestamp, data)
+class LogParseError(ValueError):
+    pass
 
-class ModelLogEvent:
+def parse_log_line(line):
+    try:
+        fields = line.split(' ', 2)
+        try:
+            event_type, timestamp_str = fields
+        except ValueError:
+            event_type, timestamp_str, data_str = fields
+            data = json.loads(data_str)
+        else:
+            data = None
+        timestamp = parse_timestamp(float(timestamp_str))
+    except ValueError:
+        raise LogParseError(f'cannot parse log line {line!r}')
+    return LogEvent(event_type, timestamp, data)
+
+class LogEvent:
 
     def __init__(self, type, timestamp, data):
         self.type = type
         self.timestamp = timestamp
         self.data = data
 
-def get_current_timestamp():
-    return datetime.datetime.now(datetime.timezone.utc).timestamp()
+def get_current_time():
+    return datetime.datetime.now(datetime.timezone.utc)
 
 def parse_timestamp(timestamp):
     return datetime.datetime.fromtimestamp(timestamp, datetime.timezone.utc)

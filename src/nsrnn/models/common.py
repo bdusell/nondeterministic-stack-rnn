@@ -1,36 +1,23 @@
+import attr
 import torch
 
-from ..pytorch_tools.unidirectional_rnn import UnidirectionalRNNBase
+from torch_rnn_tools import UnidirectionalRNN
 
-class StackRNNBase(UnidirectionalRNNBase):
+class StackRNNBase(UnidirectionalRNN):
 
-    def __init__(self, input_size, hidden_units, stack_size, controller):
+    def __init__(self, input_size, stack_reading_size, controller):
         super().__init__()
         self._input_size = input_size
-        self._hidden_units = hidden_units
-        self.stack_size = stack_size
-        self.controller = controller(input_size + stack_size, hidden_units)
+        self.stack_reading_size = stack_reading_size
+        self.controller = controller(input_size + stack_reading_size)
 
     def input_size(self):
         return self._input_size
 
     def output_size(self):
-        return self._hidden_units
+        return self.controller.output_size()
 
-    def initial_state(self, batch_size, device, *args, return_signals=False,
-            **kwargs):
-        return self.State(
-            self,
-            self.controller.initial_state(batch_size, device),
-            self.initial_stack(batch_size, self.stack_size, device, *args, **kwargs),
-            None,
-            return_signals
-        )
-
-    def initial_stack(self, batch_size, stack_size, device, *args, **kwargs):
-        raise NotImplementedError
-
-    class State(UnidirectionalRNNBase.State):
+    class State(UnidirectionalRNN.State):
 
         def __init__(self, rnn, state, stack, previous_stack, return_signals):
             super().__init__()
@@ -57,6 +44,27 @@ class StackRNNBase(UnidirectionalRNNBase):
                 output = output, self.signals
             return output
 
+        def detach(self):
+            return self.rnn.State(
+                self.rnn,
+                self.state.detach(),
+                self.stack.detach() if self.stack is not None else None,
+                self.previous_stack.detach() if self.previous_stack is not None else None,
+                self.return_signals
+            )
+
+        def batch_size(self):
+            return self.state.batch_size()
+
+        def slice_batch(self, s):
+            return self.rnn.State(
+                self.rnn,
+                self.state.slice_batch(s),
+                self.stack.slice_batch(s) if self.stack is not None else None,
+                self.previous_stack.slice_batch(s) if self.previous_stack is not None else None,
+                self.return_signals
+            )
+
         def get_output(self):
             if self._output is None:
                 self._output = self.state.output()
@@ -72,3 +80,19 @@ class StackRNNBase(UnidirectionalRNNBase):
 
         def compute_stack(self, hidden_state, stack):
             raise NotImplementedError
+
+    def initial_state(self, batch_size, *args, return_signals=False, **kwargs):
+        return self.State(
+            self,
+            self.controller.initial_state(batch_size),
+            self.initial_stack(
+                batch_size,
+                self.stack_reading_size,
+                *args,
+                **kwargs),
+            None,
+            return_signals
+        )
+
+    def initial_stack(self, batch_size, stack_size, *args, **kwargs):
+        raise NotImplementedError

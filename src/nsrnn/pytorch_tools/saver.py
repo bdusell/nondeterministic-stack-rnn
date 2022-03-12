@@ -42,6 +42,11 @@ def read_kwargs(directory_name):
     with open(kwargs_path) as fin:
         return json.load(fin)
 
+def save_kwargs(directory_name, kwargs):
+    kwargs_path = os.path.join(directory_name, KWARGS_FILE)
+    with open(kwargs_path, 'w') as fout:
+        write_json(fout, kwargs)
+
 def read_saver(model_constructor, directory_name,
         parameter_file=DEFAULT_PARAMETER_FILE, device=None):
     kwargs = read_kwargs(directory_name)
@@ -155,9 +160,7 @@ class ModelSaver:
 
     def ensure_kwargs_file_written(self):
         if not self.saved_kwargs:
-            kwargs_path = os.path.join(self.directory_name, KWARGS_FILE)
-            with open(kwargs_path, 'w') as fout:
-                write_json(fout, self.kwargs)
+            save_kwargs(self.directory_name, self.kwargs)
             self.saved_kwargs = True
 
     def ensure_param_dir_created(self):

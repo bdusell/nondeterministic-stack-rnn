@@ -7,12 +7,13 @@ import sys
 import torch
 
 from nsrnn.lang_algorithm.parsing import Parser
+from nsrnn.lang_algorithm.pcfg import string_log_probability
 from nsrnn.lower_bound_perplexity import (
-    compute_lower_bound_parts, parts_to_perplexity)
+    compute_lower_bound_parts, parts_to_perplexity, Parts)
 from utils.cli_util import parse_interval
-from utils.data_util import (
+from utils.cfl_data_util import (
     construct_sampler, generate_batches, batches_to_sequences)
-from utils.task_util import add_task_arguments, parse_task
+from utils.cfl_task_util import add_task_arguments, parse_task
 
 def main():
 
@@ -71,21 +72,21 @@ def main():
         row['batches'] = batches
         parts = compute_lower_bound_parts(
             sampler=sampler,
-            parser=parser,
+            string_log_probability=lambda s: string_log_probability(parser, s),
             samples=batches_to_sequences(batches))
-        length_lower_perp_numer, length_num_symbols, length_num_samples = parts
         length_lower_perp = parts_to_perplexity(parts, 1)
         logger.info(f'  lower bound perplexity: {length_lower_perp:.3f}')
-        row['lower_bound_perplexity_numerator'] = length_lower_perp_numer
-        row['num_symbols'] = length_num_symbols
-        row['num_samples'] = length_num_samples
+        row['lower_bound_perplexity_numerator'] = parts.total_neg_log_prob
+        row['num_symbols'] = parts.total_len
+        row['num_samples'] = parts.num_samples
         row['lower_bound_perplexity'] = length_lower_perp
-        test_num_symbols += length_num_symbols
-        test_num_samples += length_num_samples
-        test_lower_perp_numer += length_lower_perp_numer
+        test_num_symbols += parts.total_len
+        test_num_samples += parts.num_samples
+        test_lower_perp_numer += parts.total_neg_log_prob
         rows.append(row)
-    test_parts = (test_lower_perp_numer, test_num_symbols, test_num_samples)
-    test_lower_perp = parts_to_perplexity(test_parts, len(valid_lengths))
+    test_lower_perp = parts_to_perplexity(
+        Parts(test_lower_perp_numer, test_num_symbols, test_num_samples),
+        len(valid_lengths))
     logger.info(f'test lower bound perplexity: {test_lower_perp:.3f}')
     if args.output is not None:
         torch.save({

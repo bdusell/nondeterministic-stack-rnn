@@ -1,2 +1,6 @@
+/data/mikolov-ptb/
 /.venv/
 __pycache__/
+/*.sif
+/ignore/
+*.swp

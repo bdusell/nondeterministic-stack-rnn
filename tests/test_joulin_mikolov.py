@@ -3,28 +3,24 @@ import unittest
 import numpy
 import torch
 
+from torch_rnn_tools import UnidirectionalLSTM
 from nsrnn.models.joulin_mikolov import JoulinMikolovRNN
 
 class TestJoulinMikolovRNN(unittest.TestCase):
 
-    def test_synchronized_joulin_mikolov(self):
-        self._test_joulin_mikolov(synchronized=True)
-
-    def test_unsynchronized_joulin_mikolov(self):
-        self._test_joulin_mikolov(synchronized=False)
-
-    def _test_joulin_mikolov(self, synchronized):
+    def test_joulin_mikolov(self):
         stack_embedding_size = 3
         input_size = 5
         hidden_units = 7
         batch_size = 11
         sequence_length = 13
         generator = torch.manual_seed(0)
+        def controller(input_size):
+            return UnidirectionalLSTM(input_size, hidden_units)
         model = JoulinMikolovRNN(
             input_size=input_size,
-            hidden_units=hidden_units,
             stack_embedding_size=stack_embedding_size,
-            synchronized=synchronized
+            controller=controller
         )
         for p in model.parameters():
             p.data.uniform_(generator=generator)
@@ -58,11 +54,12 @@ class TestJoulinMikolovRNN(unittest.TestCase):
         batch_size = 11
         device = torch.device('cpu')
         generator = torch.manual_seed(0)
+        def controller(input_size):
+            return UnidirectionalLSTM(input_size, hidden_units)
         model = JoulinMikolovRNN(
             input_size=input_size,
-            hidden_units=hidden_units,
             stack_embedding_size=stack_embedding_size,
-            synchronized=True
+            controller=controller
         )
         for name, p in model.named_parameters():
             p.data.uniform_(generator=generator)
@@ -72,9 +69,9 @@ class TestJoulinMikolovRNN(unittest.TestCase):
         self.assertEqual(
             predicted_tensor_with_length.size(),
             (batch_size, sequence_length + 1, hidden_units))
-        state_no_length = model.initial_state(batch_size, device)
-        outputs_no_length = list(state_no_length.generate_outputs(input_tensor.transpose(0, 1)))
-        predicted_tensor_no_length = torch.stack(outputs_no_length, dim=1)
+        state_no_length = model.initial_state(batch_size)
+        predicted_tensor_no_length = state_no_length.forward(
+            input_tensor, return_state=False, include_first=True)
         self.assertEqual(
             predicted_tensor_no_length.size(),
             (batch_size, sequence_length + 1, hidden_units))
@@ -96,11 +93,12 @@ class TestJoulinMikolovRNN(unittest.TestCase):
         batch_size = 11
         sequence_length = 20
         generator = torch.manual_seed(0)
+        def controller(input_size):
+            return UnidirectionalLSTM(input_size, hidden_units)
         model = JoulinMikolovRNN(
             input_size=input_size,
-            hidden_units=hidden_units,
             stack_embedding_size=stack_embedding_size,
-            synchronized=True
+            controller=controller
         )
         for name, p in model.named_parameters():
             p.data.uniform_(generator=generator)
@@ -122,11 +120,12 @@ class TestJoulinMikolovRNN(unittest.TestCase):
         batch_size = 11
         sequence_length = 8
         generator = torch.manual_seed(0)
+        def controller(input_size):
+            return UnidirectionalLSTM(input_size, hidden_units)
         model = JoulinMikolovRNN(
             input_size=input_size,
-            hidden_units=hidden_units,
             stack_embedding_size=stack_embedding_size,
-            synchronized=True
+            controller=controller
         )
         for name, p in model.named_parameters():
             p.data.uniform_(generator=generator)
@@ -144,7 +143,7 @@ class TestJoulinMikolovRNN(unittest.TestCase):
         self.assertIsNone(signals[0])
         for signal in signals[1:]:
             self.assertIsInstance(signal, torch.Tensor)
-            self.assertEqual(signal.size(), (batch_size, 1, 3))
+            self.assertEqual(signal.size(), (batch_size, 3))
 
 class ReferenceJoulinMikolovStack:
 
@@ -165,9 +164,6 @@ class ReferenceJoulinMikolovStack:
         )
 
     def next_elements(self, push_prob, pop_prob, noop_prob, push_value):
-        push_prob = push_prob.squeeze(-1)
-        pop_prob = pop_prob.squeeze(-1)
-        noop_prob = noop_prob.squeeze(-1)
         new_stack_height = len(self.elements) + 1
         for i in range(new_stack_height):
             if i > 0:
@@ -182,9 +178,9 @@ class ReferenceJoulinMikolovStack:
                 below = self.elements[i+1]
             else:
                 below = self.bottom
-            yield push_prob * above + noop_prob * same + pop_prob * below
+            yield push_prob[:, None] * above + noop_prob[:, None] * same + pop_prob[:, None] * below
 
-def construct_reference_stack(batch_size, stack_size, sequence_length, device):
+def construct_reference_stack(batch_size, stack_size, sequence_length, max_depth, device):
     return ReferenceJoulinMikolovStack(
         [],
         torch.zeros(batch_size, stack_size, device=device)

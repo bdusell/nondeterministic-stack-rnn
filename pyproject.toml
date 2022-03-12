@@ -1,17 +1,20 @@
 [tool.poetry]
-name = "nsrnn"
+name = "renormalizing_ns_rnn"
 version = "1.0.0"
-description = "Code for the paper \"Learning Context-free Languages with Nondeterministic Stack RNNs\""
-authors = ["Brian DuSell"]
+description = "Code for the paper \"Learning Hierarchical Structures with Differentiable Nondeterministic Stacks\""
+authors = ["Brian DuSell <bdusell1@nd.edu>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
 torch = "^1.6.0"
-numpy = "^1.19.2"
-matplotlib = "^3.3.2"
+numpy = "^1.19.0"
 attrs = "^20.2.0"
 tikzplotlib = "^0.9.4"
 torch-semiring-einsum = "^1.0.0"
+more-itertools = "^8.6.0"
+scipy = "^1.5.4"
+syntaxgym = "^0.5.5"
+matplotlib = "^3.4.2"
 
 [tool.poetry.dev-dependencies]
 

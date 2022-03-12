@@ -1,1 +1,16 @@
-**/*
+data/
+!data/mikolov-ptb/vocab.txt
+experiments/
+tests/
+ignore/
+
+Dockerfile*
+**/.docker*
+**/scripts/
+**/*.sif
+
+**/.git*
+**/__pycache__/
+**/.venv/
+**/*.swp
+**/.directory

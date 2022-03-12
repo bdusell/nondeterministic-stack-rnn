@@ -2,7 +2,7 @@ import torch
 
 from .saver import (
     DEFAULT_PARAMETER_FILE, construct_saver, read_saver)
-from .init import xavier_uniform_init
+from torch_extras.init import xavier_uniform_init
 
 class ModelInterface:
 
@@ -95,8 +95,9 @@ class ModelInterface:
                 self.fail_argument_check('Argument --input is missing.')
             saver = read_saver(
                 self.construct_model, args.input, args.parameters, device)
-            saver = saver.to_directory(args.output)
-            saver.check_output()
+            if self.use_output:
+                saver = saver.to_directory(args.output)
+                saver.check_output()
         return saver
 
     def initialize(self, args, model, generator):

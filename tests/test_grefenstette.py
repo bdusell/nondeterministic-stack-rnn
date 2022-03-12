@@ -2,6 +2,7 @@ import unittest
 
 import torch
 
+from torch_rnn_tools import UnidirectionalLSTM
 from nsrnn.models.grefenstette import GrefenstetteRNN
 
 class TestGrefenstetteRNN(unittest.TestCase):
@@ -19,11 +20,12 @@ class TestGrefenstetteRNN(unittest.TestCase):
         batch_size = 11
         sequence_length = 13
         generator = torch.manual_seed(0)
+        def controller(input_size):
+            return UnidirectionalLSTM(input_size, hidden_units)
         model = GrefenstetteRNN(
             input_size=input_size,
-            hidden_units=hidden_units,
             stack_embedding_size=stack_embedding_size,
-            synchronized=synchronized
+            controller=controller
         )
         for p in model.parameters():
             p.data.uniform_(generator=generator)

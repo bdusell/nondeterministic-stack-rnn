@@ -7,15 +7,15 @@ logs=$(dirname "$BASH_SOURCE")
 
 [[ $BASH_SOURCE =~ /([^/]+)/([^/]+)/submit-jobs\.bash$ ]]
 task=${BASH_REMATCH[1]}
-model_type=${BASH_REMATCH[2]}
-name=train-$task-$model_type
+model_type=ns
+name=train-$task-${BASH_REMATCH[2]}
 
 for learning_rate in "${LEARNING_RATES[@]}"; do
   for trial_no in "${TRIALS[@]}"; do
     hyperparams=$learning_rate
     key=$name-$hyperparams-$trial_no
     bash experiments/submit-job.bash $key $logs/outputs gpu \
-      poetry run python src/train.py \
+      poetry run python src/train_cfl.py \
         --device cuda \
         --output $logs/logs/$hyperparams/$trial_no \
         --no-progress \
@@ -33,9 +33,11 @@ for learning_rate in "${LEARNING_RATES[@]}"; do
         --mean-padding-length $(( (TRAIN_LENGTH + TRAIN_LENGTH_RANGE / 2) / 2 )) \
         --parameter-seed $RANDOM \
         --model-type $model_type \
+        --normalize-operations \
+        --no-states-in-reading \
         --hidden-units $HIDDEN_UNITS \
         --num-states 3 \
-        --stack-alphabet-size 2 \
+        --stack-alphabet-size 3 \
         --block-size 32 \
         --init-scale 0.1 \
         --shuffle-seed $RANDOM \

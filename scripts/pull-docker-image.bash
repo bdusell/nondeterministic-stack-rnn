@@ -1,3 +1,6 @@
+# Pull the public Docker image. This is generally faster than building it from
+# scratch.
+
 set -e
 set -o pipefail
 

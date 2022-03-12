@@ -16,7 +16,7 @@ for stack_embedding_size in 2 $HIDDEN_UNITS $((HIDDEN_UNITS*2)); do
       hyperparams=$stack_embedding_size-$learning_rate
       key=$name-$hyperparams-$trial_no
       bash experiments/submit-job.bash $key $logs/outputs cpu \
-        poetry run python src/train.py \
+        poetry run python src/train_cfl.py \
           --device cpu \
           --output $logs/logs/$hyperparams/$trial_no \
           --no-progress \
