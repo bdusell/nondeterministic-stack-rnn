@@ -31,7 +31,7 @@ This repository includes PyTorch implementations of the following models:
 * The
   [stratification-based stack RNN](src/nsrnn/models/grefenstette.py)
   from
-  ["Learning to Transduce with Unbounded Memory"](https://proceedings.neurips.cc/paper/2015/file/b9d487a30398d42ecff55c228ed5652b-Paper.pdf).
+  ["Learning to Transduce with Unbounded Memory" (Grefenstette et al., 2015)](https://proceedings.neurips.cc/paper/2015/file/b9d487a30398d42ecff55c228ed5652b-Paper.pdf).
 
 ## Directory Structure
 
@@ -68,11 +68,12 @@ an equivalent [Singularity](https://sylabs.io/docs/#singularity) image which
 can be used on an HPC cluster, where it is likely that Docker is not available
 but Singularity is.
 
-In any case, it is highly recommended to run experiments that use the NS-RNN or
-RNS-RNN models on a machine with access to an NVIDIA GPU so that they finish
-within a reasonable amount of time. On the other hand, the experiments for the
-baseline models (LSTM, superposition stack LSTM, and stratification stack LSTM)
-finish more quickly on CPU rather than GPU and should be run in CPU mode.
+In any case, it is highly recommended to run most experiments on a machine with
+access to an NVIDIA GPU so that they finish within a reasonable amount of time.
+The exception to this is the experiments for the baseline models (LSTM,
+superposition stack LSTM, and stratification stack LSTM) on the CFL language
+modeling tasks, as they finish more quickly on CPU rather than GPU and should
+be run in CPU mode.
 
 ### Using Docker
 
@@ -111,21 +112,27 @@ Docker, but there's a chance it does support Singularity, which is an
 alternative container runtime that is more suitable for shared computing
 environments.
 
-In order to run the Singularity container, you must obtain the Docker image and
-then convert it to a `.sif` (Singularity image) file. Assuming you have already
-pulled or built the Docker image according to the instructions above, you can
-use the following to create the `.sif` file:
+In order to run the code in a Singularity container, you must first obtain the
+Docker image and then convert it to a `.sif` (Singularity image) file on a
+machine where you have root access (e.g. your personal computer or
+workstation). This requires installing both Docker and
+[Singularity](https://sylabs.io/guides/3.9/user-guide/quick_start.html)
+on that machine. Assuming you have already pulled or built the Docker image
+according to the instructions above, you can use the following to create the
+`.sif` file:
 
     $ bash scripts/build-singularity-image.bash
 
-This will create the file `renormalizing-ns-rnn.sif`.
+This will create the file `renormalizing-ns-rnn.sif`. It is normal for this to
+take several minutes. Afterwards, you can upload the `.sif` file to your
+HPC cluster and use it there.
 
 You can open a shell in the Singularity container using
 
     $ bash scripts/singularity-shell.bash
 
-This will work on both GPU and CPU machines, although it will output a warning
-if there is no GPU.
+This will work on machines that do and do not have an NVIDIA GPU, although it
+will output a warning if there is no GPU.
 
 You can find a more general tutorial on Singularity
 [here](https://github.com/bdusell/singularity-tutorial).
@@ -135,8 +142,8 @@ You can find a more general tutorial on Singularity
 Whatever method you use to run the code (whether in a Docker container,
 Singularity container, or no container), there are some additional setup and
 preprocessing steps you need to run. The following script will take care of
-these for you (note that if you are using a container, you must run this
-*inside the container shell*):
+these for you (if you are using a container, you must run this *inside the
+container shell*):
 
     $ bash scripts/setup.bash
 
@@ -154,14 +161,15 @@ Python packages provided by the Poetry package manager. This means you should
 either prefix all of your commands with `poetry run` or run `poetry shell`
 beforehand to enter a shell with Poetry's virtualenv enabled all the time. You
 should run both Python and Bash scripts with Poetry, because the Bash scripts
-might call out to Python scripts.
+might call out to Python scripts. All Bash scripts under `src/` should be run
+with `src/` as the current working directory.
 
 All scripts under `scripts/` should be run with the top-level directory as the
 current working directory.
 
 ## Running Experiments
 
-The [`experiments`](experiments) directory contains scripts for reproducing
+The [`experiments/`](experiments) directory contains scripts for reproducing
 all of the experiments and plots presented in the paper. These scripts are
 intended to be used to submit jobs to a computing cluster. They should be run
 outside of the container. You will need to edit the file
