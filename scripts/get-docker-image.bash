@@ -19,7 +19,7 @@ Options:
 mode=none
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --pull) mode=build ;;
+    --pull) mode=pull ;;
     --build) mode=build ;;
     *) usage >&2; exit 1 ;;
   esac
