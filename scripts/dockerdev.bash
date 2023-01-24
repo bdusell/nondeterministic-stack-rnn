@@ -61,10 +61,10 @@
 #     Runs a command in a dev container that is part of a stack.
 
 # Start of include guard.
-if [[ ! $_DOCKERDEV_INCLUDED ]]; then
+if [[ ! ${_DOCKERDEV_INCLUDED-} ]]; then
 _DOCKERDEV_INCLUDED=1
 
-DOCKERDEV_VERSION='0.4.1'
+DOCKERDEV_VERSION='0.5.1'
 
 # dockerdev_container_info <container-name>
 #   Get the image name and status of a container.
@@ -113,17 +113,22 @@ _dockerdev_add_user() {
 }
 
 # dockerdev_start_new_dev_container <container-name> <image-name> \
-#     [--x11] [-- <docker-run-flags>...]
-#   Start a new container with a certain image and set up a non-root user. If
-#   the --x11 flag is used, the container will be connected to the X server on
-#   the host so that GUIs can be used.
+#     [--x11] [--docker] [-- <docker-run-flags>...]
+#   Start a new container with a certain image and set up a non-root user.
+#   Options:
+#   --x11     Connect the container to the X server on the host so that GUIs
+#             can be used.
+#   --docker  Connect the container to the Docker daemon on the host so that
+#             it can use the Docker client.
 dockerdev_start_new_dev_container() {
-  local container_name
-  local image_name
+  local container_name=
+  local image_name=
   local x11=false
+  local docker=false
   while [[ $# -gt 0 ]]; do
     case $1 in
       --x11) x11=true ;;
+      --docker) docker=true ;;
       --) shift; break ;;
       *)
         if [[ ! $container_name ]]; then
@@ -137,10 +142,28 @@ dockerdev_start_new_dev_container() {
     esac
     shift
   done
+  # Add the docker group to the user so we have the proper permissions to run
+  # Docker-in-Docker. Only supported for Linux for now.
+  local docker_in_docker_args=() &&
+  if $docker; then
+    case "$OSTYPE" in
+      darwin*)
+        echo 'error: --docker is not implemented for MacOS' 1>&2 &&
+        return 1
+        ;;
+      *)
+        local dockergroupid
+        dockergroupid=$(getent group docker | cut -d : -f 3) &&
+        docker_in_docker_args=( \
+          --group-add "$dockergroupid" \
+          -v /var/run/docker.sock:/var/run/docker.sock \
+        )
+        ;;
+    esac
+  fi
   if $x11; then
     local userid
     local groupid
-    local dockergroupid
     # Connect the container to the host's X server and make a home directory.
     # See http://wiki.ros.org/docker/Tutorials/GUI
     # and https://medium.com/@SaravSun/running-gui-applications-inside-docker-containers-83d65c0db110
@@ -155,6 +178,7 @@ dockerdev_start_new_dev_container() {
         xhost + "$ip_address" > /dev/null &&
         dockerdev_start_new_container "$container_name" "$image_name" -it \
           -u "$userid":"$groupid" \
+          ${docker_in_docker_args[@]+"${docker_in_docker_args[@]}"} \
           -e DISPLAY="$ip_address":0 \
           -v /tmp/.X11-unix:/tmp/.X11-unix:rw \
           "$@" &&
@@ -163,13 +187,9 @@ dockerdev_start_new_dev_container() {
         docker exec -i -u 0:0 "$container_name" sh -c "$add_user"
         ;;
       *)
-        # Make sure to add the docker group to the user so we have the proper
-        # permissions to run Docker-in-Docker.
-        dockergroupid=$(getent group docker | cut -d : -f 3) &&
         dockerdev_start_new_container "$container_name" "$image_name" -it \
           -u "$userid":"$groupid" \
-          --group-add "$dockergroupid" \
-          -v /var/run/docker.sock:/var/run/docker.sock \
+          ${docker_in_docker_args[@]+"${docker_in_docker_args[@]}"} \
           -e DISPLAY \
           -v /etc/group:/etc/group:ro \
           -v /etc/passwd:/etc/passwd:ro \
@@ -192,7 +212,11 @@ dockerdev_start_new_dev_container() {
     esac
   else
     local add_user &&
-    dockerdev_start_new_container "$container_name" "$image_name" -it "$@" &&
+    dockerdev_start_new_container \
+      "$container_name" \
+      "$image_name" \
+      -it "$@" \
+      ${docker_in_docker_args[@]+"${docker_in_docker_args[@]}"} &&
     # Add a user matching the user on the host system, so we can write files as
     # the same (non-root) user as the host. This allows us to do things like
     # write node_modules and lock files into a bind-mounted volume with the
@@ -235,9 +259,9 @@ dockerdev_ensure_dev_container_started() {
 # _dockerdev_ensure_container_started_impl <image-name> [--start <command>] \
 #   [--on-start <command>] [<start-args>...] [-- <docker-run-flags>...]
 _dockerdev_ensure_container_started_impl() {
-  local start_container_cmd
+  local start_container_cmd=
   local on_start_cmd=:
-  local image_name
+  local image_name=
   local start_args=()
   while [[ $# -gt 0 ]]; do
     case $1 in
@@ -284,12 +308,12 @@ _dockerdev_ensure_container_started_impl() {
       docker stop "$container_name" &&
       echo "Renaming container $container_name to $new_name" 1>&2 &&
       docker rename "$container_name" "$new_name" &&
-      $start_container_cmd "${start_args[@]}" "$image_name" "$container_name" "$@" &&
+      $start_container_cmd ${start_args[@]+"${start_args[@]}"} "$image_name" "$container_name" "$@" &&
       $on_start_cmd "$container_name"
     fi
   else
     # No container with the expected name exists.
-    $start_container_cmd "${start_args[@]}" "$image_name" "$container_name" "$@" &&
+    $start_container_cmd ${start_args[@]+"${start_args[@]}"} "$image_name" "$container_name" "$@" &&
     $on_start_cmd "$container_name"
   fi
 }
@@ -299,11 +323,18 @@ _dockerdev_ensure_container_started_impl() {
 dockerdev_run_in_container() {
   local cols
   local lines
+  local flags=i
+  # Automatically use a pseduo-TTY if stdout is a TTY. Disabling this option
+  # when stdout is not a TTY lets Docker play nice with batch submission
+  # systems.
+  if [[ -t 1 ]]; then
+    flags+=t
+  fi &&
   # COLUMNS and LINES fix an issue with terminal width.
   # See https://github.com/moby/moby/issues/33794
   cols=$(tput cols) &&
   lines=$(tput lines) &&
-  docker exec -it -e COLUMNS="$cols" -e LINES="$lines" "$@"
+  docker exec -"$flags" -e COLUMNS="$cols" -e LINES="$lines" "$@"
 }
 
 # dockerdev_run_in_dev_container <docker-exec-args>...

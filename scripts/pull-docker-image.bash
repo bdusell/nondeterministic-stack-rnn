@@ -2,7 +2,7 @@
 # scratch.
 
 set -e
-set -o pipefail
+set -u
 
 . scripts/variables.bash
 

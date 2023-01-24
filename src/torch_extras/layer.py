@@ -55,9 +55,21 @@ class Layer(torch.nn.Module):
         
         :param generator: Optional PyTorch RNG.
         """
-        xavier_uniform_(self.linear.weight, self.get_gain(), generator=generator)
+        xavier_uniform_(
+            self.linear.weight,
+            self.fan_in_size(),
+            self.fan_out_size(),
+            self.get_gain(),
+            generator=generator
+        )
         if self.linear.bias is not None:
             torch.nn.init.constant_(self.linear.bias, 0.0)
+
+    def fan_in_size(self) -> int:
+        return self.input_size()
+
+    def fan_out_size(self) -> int:
+        return self.output_size()
 
     def input_size(self) -> int:
         """Get the size of the input to this layer."""
@@ -98,10 +110,11 @@ class FeedForward(torch.nn.Sequential):
         return self[-1].output_size()
 
 class MultiLayer(Layer):
-    """A module representing :math:`n` fully-connected layers all with the
-    same input. The layer outputs will be computed in parallel."""
+    """A module representing :math:`num_layers` fully-connected layers all with
+    the same input and activation function. The layer outputs will be computed
+    in parallel."""
 
-    def __init__(self, input_size: int, output_size: int, n: int,
+    def __init__(self, input_size: int, output_size: int, num_layers: int,
             activation: torch.nn.Module=torch.nn.Identity(), bias: bool=True):
         """
         :param input_size: The number of units in the input to the layers.
@@ -111,10 +124,14 @@ class MultiLayer(Layer):
             function is applied.
         :param bias: Whether to use a bias term.
         """
-        super().__init__(input_size, output_size * n, activation=activation,
-            bias=bias)
+        super().__init__(
+            input_size,
+            num_layers * output_size,
+            activation=activation,
+            bias=bias
+        )
         self._output_size = output_size
-        self.n = n
+        self._num_layers = num_layers
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         r"""Let :math:`B` be batch size, :math:`X` be ``input_size``,
@@ -126,19 +143,25 @@ class MultiLayer(Layer):
         # y : B x (n * Y)
         y = self.linear(x)
         # y_view : B x n x Y
-        y_view = y.view(x.size(0), self.n, -1)
+        y_view = y.view(x.size(0), self._num_layers, self._output_size)
         # return : B x n x Y
         return self.activation(y_view)
 
-    def output_size(self) -> int:
+    def fan_out_size(self) -> int:
         return self._output_size
 
-def xavier_uniform_(tensor: torch.Tensor, gain: float,
-        generator: typing.Optional[torch.Generator]):
+    def output_size(self) -> typing.Tuple[int, int]:
+        return (self._num_layers, self._output_size)
+
+def xavier_uniform_(
+        tensor: torch.Tensor,
+        fan_in: int,
+        fan_out: int,
+        gain: float,
+        generator: typing.Optional[torch.Generator]
+    ):
     """A rewrite of :py:func:`~torch.nn.init.xavier_uniform` that accepts a
-    RNG and works on 3-dimensional tensors."""
-    fan_out = tensor.size(0)
-    fan_in = tensor.size(-1)
+    RNG and works on multi-dimensional tensors."""
     std = gain * math.sqrt(2.0 / (fan_in + fan_out))
     a = math.sqrt(3.0) * std
     with torch.no_grad():

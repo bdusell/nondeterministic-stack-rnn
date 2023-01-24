@@ -1,20 +1,22 @@
 [tool.poetry]
-name = "renormalizing_ns_rnn"
+name = "nondeterministic_stack_rnn_2023"
 version = "1.0.0"
-description = "Code for the paper \"Learning Hierarchical Structures with Differentiable Nondeterministic Stacks\""
+description = "Code for the paper \"The Surprising Computational Power of Nondeterministic Stack RNNs\""
 authors = ["Brian DuSell <bdusell1@nd.edu>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-torch = "^1.6.0"
+torch = "^1.12.0"
 numpy = "^1.19.0"
 attrs = "^20.2.0"
 tikzplotlib = "^0.9.4"
-torch-semiring-einsum = "^1.0.0"
 more-itertools = "^8.6.0"
 scipy = "^1.5.4"
-syntaxgym = "^0.5.5"
 matplotlib = "^3.4.2"
+humanize = "^3.12.0"
+torch-semiring-einsum = {git = "https://github.com/bdusell/semiring-einsum", rev = "d24f0d87b6060f975e84c0214f523475c59d4888"}
+pytest = "^7.1.2"
+scikit-learn = "^1.1.2"
 
 [tool.poetry.dev-dependencies]
 

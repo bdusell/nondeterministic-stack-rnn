@@ -3,17 +3,11 @@ import unittest
 import torch
 
 from torch_rnn_tools import UnidirectionalLSTM
-from nsrnn.models.grefenstette import GrefenstetteRNN
+from stack_rnn_models.grefenstette import GrefenstetteRNN
 
 class TestGrefenstetteRNN(unittest.TestCase):
 
-    def test_synchronized_grefenstette(self):
-        self._test_grefenstette(True)
-
-    def test_unsynchronized_grefenstette(self):
-        self._test_grefenstette(False)
-
-    def _test_grefenstette(self, synchronized):
+    def test_grefenstette(self):
         stack_embedding_size = 3
         input_size = 5
         hidden_units = 7

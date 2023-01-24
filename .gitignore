@@ -1,8 +1,7 @@
-/data/mikolov-ptb/
-/ignore/
-/code.zip
-/*.sif
 /.venv/
-
 __pycache__/
+/*.sif
+/ignore/
 *.swp
+/data/
+/code.zip

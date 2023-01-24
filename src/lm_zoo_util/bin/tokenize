@@ -1,8 +1,0 @@
-#!/bin/bash
-set -e
-set -o pipefail
-cd /app/src
-poetry run python lm_zoo_util/run_tokenize.py \
-  --vocab "$(< /app/model/vocab-file.txt)" \
-  --dataset "$(< /app/model/dataset.txt)" \
-  "$@"

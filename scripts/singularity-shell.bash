@@ -1,8 +1,5 @@
-# Open a shell in the Singularity container, assuming the .sif file has already
-# been created.
-
 set -e
-set -o pipefail
+set -u
 
 . scripts/variables.bash
 

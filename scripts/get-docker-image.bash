@@ -1,5 +1,5 @@
 set -e
-set -o pipefail
+set -u
 
 . scripts/variables.bash
 
@@ -7,8 +7,8 @@ usage() {
   echo "Usage: $0 [options]
 
 Ensure that the Docker image exists locally, either by pulling the public
-version or building it from scratch. If no options are passed, this script does
-nothing.
+version or building it from scratch. If no options are passed, this script
+does nothing.
   
 Options:
   --pull    Pull the public Docker image.
@@ -19,7 +19,7 @@ Options:
 mode=none
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --pull) mode=pull ;;
+    --pull) mode=build ;;
     --build) mode=build ;;
     *) usage >&2; exit 1 ;;
   esac

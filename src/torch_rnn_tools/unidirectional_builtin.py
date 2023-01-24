@@ -34,7 +34,7 @@ class BuiltinUnidirectionalRNN(UnidirectionalRNN):
         self._hidden_units = hidden_units
         self._layers = layers
 
-    def _initial_tensors(self, batch_size):
+    def _initial_tensors(self, batch_size, first_layer):
         raise NotImplementedError
 
     def _apply_to_hidden_state(self, hidden_state, func):
@@ -118,6 +118,11 @@ class BuiltinUnidirectionalRNN(UnidirectionalRNN):
                 else:
                     return output_sequence
             # output_sequence : batch_size x sequence_length x hidden_units
+            # The type and size of new_hidden_state depends on the RNN unit.
+            # For torch.nn.RNN, it's a tensor whose size is
+            # num_layers x batch_size x hidden_units, where
+            # new_hidden_state[-1] is the last layer and is equal to
+            # output_sequence[:, -1].
             output_sequence, new_hidden_state = self.rnn.rnn(
                 input_sequence,
                 self.hidden_state)
@@ -136,8 +141,12 @@ class BuiltinUnidirectionalRNN(UnidirectionalRNN):
             else:
                 return output_sequence
 
-    def initial_state(self, batch_size: int):
-        hidden_state, output = self._initial_tensors(batch_size)
+    def initial_state(self, batch_size: int, first_layer: typing.Optional[torch.Tensor]=None):
+        """
+        :param first_layer: An optional tensor that will be used as the first
+            layer of the initial hidden state.
+        """
+        hidden_state, output = self._initial_tensors(batch_size, first_layer)
         return self.State(self, hidden_state, output)
 
 class UnidirectionalElmanRNN(BuiltinUnidirectionalRNN):
@@ -168,13 +177,36 @@ class UnidirectionalElmanRNN(BuiltinUnidirectionalRNN):
 
     RNN_CLASS = torch.nn.RNN
 
-    def _initial_tensors(self, batch_size):
-        zero = torch.zeros(
-            self._layers,
-            batch_size,
-            self._hidden_units,
-            device=self.device)
-        return zero, zero[0]
+    def _initial_tensors(self, batch_size, first_layer):
+        # The initial tensor is a tensor of all the hidden states of all layers
+        # before the first timestep.
+        # Its size needs to be num_layers x batch_size x hidden_units, where
+        # index 0 is the first layer and -1 is the last layer.
+        # Note that the batch dimension is always the second dimension even
+        # when batch_first=True.
+        if first_layer is None:
+            h = torch.zeros(
+                self._layers,
+                batch_size,
+                self._hidden_units,
+                device=self.device
+            )
+        else:
+            expected_size = (batch_size, self._hidden_units)
+            if first_layer.size() != expected_size:
+                raise ValueError(
+                    f'first_layer should be of size {expected_size}, but '
+                    f'got {first_layer.size()}')
+            h = torch.cat([
+                first_layer[None],
+                torch.zeros(
+                    self._layers - 1,
+                    batch_size,
+                    self._hidden_units,
+                    device=self.device
+                )
+            ], dim=0)
+        return h, h[-1]
 
     def _apply_to_hidden_state(self, hidden_state, func):
         return func(hidden_state)
@@ -202,13 +234,36 @@ class UnidirectionalLSTM(BuiltinUnidirectionalRNN):
 
     RNN_CLASS = torch.nn.LSTM
 
-    def _initial_tensors(self, batch_size):
-        zero = torch.zeros(
-            self._layers,
-            batch_size,
-            self._hidden_units,
-            device=self.device)
-        return (zero, zero), zero[0]
+    def _initial_tensors(self, batch_size, first_layer):
+        if first_layer is None:
+            h = c = torch.zeros(
+                self._layers,
+                batch_size,
+                self._hidden_units,
+                device=self.device
+            )
+        else:
+            expected_size = (batch_size, self._hidden_units)
+            if first_layer.size() != expected_size:
+                raise ValueError(
+                    f'first_layer should be of size {expected_size}, but '
+                    f'got {first_layer.size()}')
+            h = torch.cat([
+                first_layer[None],
+                torch.zeros(
+                    self._layers - 1,
+                    batch_size,
+                    self._hidden_units,
+                    device=self.device
+                )
+            ], dim=0)
+            c = torch.zeros(
+                self._layers,
+                batch_size,
+                self._hidden_units,
+                device=self.device
+            )
+        return (h, c), h[-1]
 
     def _apply_to_hidden_state(self, hidden_state, func):
         return tuple(map(func, hidden_state))

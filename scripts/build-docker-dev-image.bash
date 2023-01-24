@@ -1,7 +1,5 @@
-# Build the Docker image used to run the code in this repository.
-
 set -e
-set -o pipefail
+set -u
 
 . scripts/variables.bash
 

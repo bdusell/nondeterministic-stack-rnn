@@ -1,4 +1,5 @@
 set -e
+set -u
 set -o pipefail
 
 . scripts/dockerdev.bash
@@ -7,7 +8,7 @@ set -o pipefail
 usage() {
   echo "Usage: $0 [options]
 
-Execute a command in the Docker container, optionally pulling or building the
+Open a shell in the Docker container, optionally pulling or building the
 image first.
 
 Options:
@@ -18,7 +19,7 @@ Options:
 }
 
 get_options=()
-start_options=(--gpus all)
+start_options=(--gpus all --privileged)
 while [[ $# -gt 0 ]]; do
   case $1 in
     --pull|--build) get_options+=("$1") ;;
@@ -30,5 +31,10 @@ while [[ $# -gt 0 ]]; do
 done
 
 bash scripts/get-docker-image.bash "${get_options[@]}"
-dockerdev_ensure_dev_container_started "$DEV_IMAGE" --x11 -- -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD":/app/ "${start_options[@]}" &&
+dockerdev_ensure_dev_container_started "$DEV_IMAGE" \
+  --x11 \
+  --docker \
+  -- \
+  -v "$PWD":/app/ \
+  "${start_options[@]}"
 dockerdev_run_in_dev_container "$DEV_IMAGE" "$@"

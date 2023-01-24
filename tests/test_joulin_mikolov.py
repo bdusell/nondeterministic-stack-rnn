@@ -4,7 +4,7 @@ import numpy
 import torch
 
 from torch_rnn_tools import UnidirectionalLSTM
-from nsrnn.models.joulin_mikolov import JoulinMikolovRNN
+from stack_rnn_models.joulin_mikolov import JoulinMikolovRNN
 
 class TestJoulinMikolovRNN(unittest.TestCase):
 
@@ -61,7 +61,7 @@ class TestJoulinMikolovRNN(unittest.TestCase):
             stack_embedding_size=stack_embedding_size,
             controller=controller
         )
-        for name, p in model.named_parameters():
+        for p in model.parameters():
             p.data.uniform_(generator=generator)
         input_tensor = torch.empty(batch_size, sequence_length, input_size)
         input_tensor.uniform_(generator=generator)
@@ -113,12 +113,12 @@ class TestJoulinMikolovRNN(unittest.TestCase):
             predicted_tensor.detach(),
             predicted_tensor_reference.detach())
 
-    def test_return_signals(self):
+    def test_return_actions(self):
         stack_embedding_size = 3
         input_size = 5
         hidden_units = 7
         batch_size = 11
-        sequence_length = 8
+        input_length = 8
         generator = torch.manual_seed(0)
         def controller(input_size):
             return UnidirectionalLSTM(input_size, hidden_units)
@@ -129,21 +129,109 @@ class TestJoulinMikolovRNN(unittest.TestCase):
         )
         for name, p in model.named_parameters():
             p.data.uniform_(generator=generator)
-        input_tensor = torch.empty(batch_size, sequence_length, input_size)
+        input_tensor = torch.empty(batch_size, input_length, input_size)
         input_tensor.uniform_(generator=generator)
-        predicted_tensor, signals = model(input_tensor, return_signals=True)
+        predicted_tensor, actions = model(input_tensor, return_actions=True)
         self.assertIsInstance(predicted_tensor, torch.Tensor)
         self.assertEqual(
             predicted_tensor.size(),
-            (batch_size, sequence_length + 1, hidden_units),
+            (batch_size, input_length + 1, hidden_units),
             'output has the expected dimensions'
         )
-        self.assertIsInstance(signals, list)
-        self.assertEqual(len(signals), sequence_length + 1)
-        self.assertIsNone(signals[0])
-        for signal in signals[1:]:
-            self.assertIsInstance(signal, torch.Tensor)
-            self.assertEqual(signal.size(), (batch_size, 3))
+        self.assertIsInstance(actions, list)
+        self.assertEqual(len(actions), input_length + 1)
+        # The actions returned at each timestep represent the actions emitted
+        # after the previous timestep to compute the current timestep.
+        # The actions for the first two timesteps should be None. For timestep
+        # 0, it is None because the initial state has no previous state and no
+        # previous actions. For timestep 1, it is None because the stack is
+        # initialized from scratch just before that timstep, so again there are
+        # no previous stack actions.
+        for action in actions[:2]:
+            self.assertIsNone(action)
+        for action in actions[2:]:
+            self.assertIsInstance(action, torch.Tensor)
+            self.assertEqual(action.size(), (batch_size, 1, 3))
+
+    def test_truncated_bptt(self):
+        batch_size = 5
+        input_size = 7
+        hidden_units = 11
+        stack_embedding_size = hidden_units
+        sequence_length = 13
+        generator = torch.manual_seed(123)
+        def controller(input_size):
+            return UnidirectionalLSTM(input_size, hidden_units)
+        model = JoulinMikolovRNN(
+            input_size=input_size,
+            stack_embedding_size=stack_embedding_size,
+            controller=controller,
+            push_hidden_state=True,
+            stack_depth_limit=10
+        )
+        for p in model.parameters():
+            p.data.uniform_(-0.1, 0.1, generator=generator)
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.1)
+        criterion = torch.nn.MSELoss()
+        state = model.initial_state(batch_size)
+
+        # First iteration
+        optimizer.zero_grad()
+        self.assertEqual(state.batch_size(), batch_size)
+        input_tensor = torch.empty(batch_size, sequence_length, input_size)
+        input_tensor.uniform_(-1, 1, generator=generator)
+        predicted_tensor, state = model(
+            input_tensor,
+            initial_state=state,
+            return_state=True,
+            include_first=False
+        )
+        state = state.detach()
+        self.assertEqual(
+            predicted_tensor.size(),
+            (batch_size, sequence_length, hidden_units),
+            'output does not have expected dimensions'
+        )
+        self.assert_is_finite(predicted_tensor)
+        target_tensor = torch.empty(batch_size, sequence_length, hidden_units)
+        target_tensor.uniform_(-1, 1, generator=generator)
+        loss = criterion(predicted_tensor, target_tensor)
+        loss.backward()
+        for name, p in model.named_parameters():
+            self.assert_is_finite(p.grad, f'gradient for parameter {name} is not finite')
+        optimizer.step()
+
+        # Second iteration with smaller batch size.
+        self.assertEqual(state.batch_size(), batch_size)
+        batch_size -= 1
+        state = state.slice_batch(slice(batch_size))
+        self.assertEqual(state.batch_size(), batch_size)
+        optimizer.zero_grad()
+        input_tensor = torch.empty(batch_size, sequence_length, input_size)
+        input_tensor.uniform_(-1, 1, generator=generator)
+        predicted_tensor, state = model(
+            input_tensor,
+            initial_state=state,
+            return_state=True,
+            include_first=False
+        )
+        state = state.detach()
+        self.assertEqual(
+            predicted_tensor.size(),
+            (batch_size, sequence_length, hidden_units),
+            'output does not have expected dimensions'
+        )
+        self.assert_is_finite(predicted_tensor)
+        target_tensor = torch.empty(batch_size, sequence_length, hidden_units)
+        target_tensor.uniform_(-1, 1, generator=generator)
+        loss = criterion(predicted_tensor, target_tensor)
+        loss.backward()
+        for name, p in model.named_parameters():
+            self.assert_is_finite(p.grad, f'gradient for parameter {name} is not finite')
+        optimizer.step()
+
+    def assert_is_finite(self, tensor, message=None):
+        self.assertTrue(torch.all(torch.isfinite(tensor)).item(), message)
 
 class ReferenceJoulinMikolovStack:
 
@@ -178,7 +266,7 @@ class ReferenceJoulinMikolovStack:
                 below = self.elements[i+1]
             else:
                 below = self.bottom
-            yield push_prob[:, None] * above + noop_prob[:, None] * same + pop_prob[:, None] * below
+            yield push_prob[:, :] * above + noop_prob[:, :] * same + pop_prob[:, :] * below
 
 def construct_reference_stack(batch_size, stack_size, sequence_length, max_depth, device):
     return ReferenceJoulinMikolovStack(

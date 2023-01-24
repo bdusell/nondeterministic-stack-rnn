@@ -2,11 +2,11 @@ import math
 import random
 import unittest
 
-from nsrnn.formal_models.parse_tree import ParseTree as Tree
-from nsrnn.formal_models.pcfg import Grammar, Rule, Terminal, Nonterminal
-from nsrnn.formal_models.pcfg_length_sampling import LengthSampler
-from nsrnn.lang_algorithm.parsing import Parser
-from nsrnn.lang_algorithm.pcfg import string_log_probability
+from lib.formal_models.parse_tree import ParseTree as Tree
+from lib.formal_models.pcfg import Grammar, Rule, Terminal, Nonterminal
+from lib.formal_models.pcfg_length_sampling import LengthSampler
+from lib.lang_algorithm.parsing import Parser
+from lib.lang_algorithm.pcfg import string_log_probability
 
 S = Nonterminal('S')
 a = Terminal('a')
