@@ -71,7 +71,7 @@ but Singularity is.
 In any case, it is highly recommended to run most experiments on a machine with
 access to an NVIDIA GPU so that they finish within a reasonable amount of time.
 The exception to this is the experiments for the baseline models (LSTM,
-superposition stack LSTM, and stratification stack LSTM) on the CFL language
+superposition stack LSTM, and stratification stack LSTM) on the formal language
 modeling tasks, as they finish more quickly on CPU rather than GPU and should
 be run in CPU mode.
 
