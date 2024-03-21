@@ -13,7 +13,7 @@ If you are looking for the code for our earlier paper
 [this release](https://github.com/bdusell/nondeterministic-stack-rnn/tree/iclr2022).
 
 If you are looking for the code for our earlier paper
-["Learning Context-free Languages with Nondeterministic Stack RNNs"](https://aclanthology.org/2020.conll-1.41/),
+["Learning Context-free Languages with Nondeterministic Stack RNNs"](https://aclanthology.org/2020.conll-1.41/)
 (DuSell and Chiang, 2020), please see
 [this release](https://github.com/bdusell/nondeterministic-stack-rnn/tree/conll2020).
 
